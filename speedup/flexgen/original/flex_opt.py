@@ -16,7 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from flexgen.compression import CompressionConfig
-from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights
+from flexgen.opt_config import OptConfig, get_opt_config, download_opt_weights, init_opt_weights
 from flexgen.pytorch_backend import (TorchDevice, TorchDisk, TorchLink,
     TorchMixedDevice, DeviceType, general_copy, fix_recursive_import)
 from flexgen.timer import timers
@@ -645,9 +645,11 @@ class OptLM:
         expanded_path = os.path.abspath(os.path.expanduser(
             os.path.join(self.path, f"{self.config.name}-np")))
         check_path = os.path.join(expanded_path, "decoder.embed_positions.weight")
+        print(f"Checking weight path: {check_path}")
         if not os.path.exists(check_path) and DUMMY_WEIGHT not in check_path:
-            download_opt_weights(self.config.name, self.path)
-
+            print(f"Downloaded weights to {self.config.name} path: {self.path}")
+            # download_opt_weights(self.config.name, self.path)
+            init_opt_weights(self.config.name, self.path)
         self.layers[j].init_weight(self.weight_home[j], expanded_path)
 
     def load_weight(self, i, j, k, overlap=True):
@@ -1183,7 +1185,7 @@ def run_flexgen(args):
     if args.model == "facebook/galactica-30b":
         tokenizer = AutoTokenizer.from_pretrained("facebook/galactica-30b", padding_side="left")
     else:
-        tokenizer = AutoTokenizer.from_pretrained("facebook/opt-30b", padding_side="left")
+        tokenizer = AutoTokenizer.from_pretrained(args.model, padding_side="left")
     num_prompts = args.num_gpu_batches * args.gpu_batch_size
     prompt_len, gen_len, cut_gen_len = args.prompt_len, args.gen_len, args.cut_gen_len
 
@@ -1213,16 +1215,38 @@ def run_flexgen(args):
     opt_config = get_opt_config(args.model)
     cache_size = opt_config.cache_bytes(num_prompts, prompt_len + gen_len)
     hidden_size = opt_config.hidden_bytes(num_prompts, prompt_len + gen_len)
+    print(f"Config: {opt_config} ")
     model = OptLM(opt_config, env, args.path, policy)
+
+    profile = True
 
     try:
         output_ids = model.generate(
             warmup_inputs, max_new_tokens=1, verbose=args.verbose)
 
         timers("generate").reset()
-        output_ids = model.generate(
-            inputs, max_new_tokens=args.gen_len,
-            debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
+        if(profile):
+            from torch.profiler import profile, ProfilerActivity
+            activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
+            with profile(activities=activities, 
+                        record_shapes=True,
+                        profile_memory=True,  # This will take 1 to 2 minutes. Setting it to False could greatly speedup.
+                        # on_trace_ready=torch.profiler.tensorboard_trace_handler('/home/ubuntu/clk/infinigen/log/result', worker_name = 'worker0' ),
+                        with_stack=True) as prof:   
+                output_ids = model.generate(
+                    inputs, max_new_tokens=args.gen_len,
+                    debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
+                # prof.step()
+            import time
+            worker_name = 'int4'
+            dir_name = '/home/ubuntu/clk/infinigen/log/result'
+            file_name = f"{worker_name}.{time.time_ns()}.pt.trace.json"
+            file_name = file_name + ".gz"
+            prof.export_chrome_trace(os.path.join(dir_name, file_name))
+        else:
+            output_ids = model.generate(
+                inputs, max_new_tokens=args.gen_len,
+                debug_mode=args.debug_mode, cut_gen_len=cut_gen_len, verbose=args.verbose)
         costs = timers("generate").costs
     finally:
         env.close_copy_threads()
@@ -1254,12 +1278,12 @@ def run_flexgen(args):
     print("=================================================")
 
 def add_parser_arguments(parser):
-    parser.add_argument("--model", type=str, default="facebook/opt-6.7b",
+    parser.add_argument("--model", type=str, default="/mnt/data/clk/opt-6.7b",
         help="The model name.")
-    parser.add_argument("--path", type=str, default="~/opt_weights",
+    parser.add_argument("--path", type=str, default="/mnt/data/clk/opt-6.7b/opt-weights",
         help="The path to the model weights. If there are no cached weights, "
              "FlexGen will automatically download them from HuggingFace.")
-    parser.add_argument("--offload-dir", type=str, default="~/flexgen_offload_dir",
+    parser.add_argument("--offload-dir", type=str, default="/mnt/data/clk/flexgen_offload_dir",
         help="The directory to offload tensors. ")
     parser.add_argument("--prompt-len", type=int, default=512)
     parser.add_argument("--gen-len", type=int, default=32)

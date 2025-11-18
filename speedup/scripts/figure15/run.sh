@@ -1,8 +1,11 @@
 UVM_PATH=$PWD/../../uvm
 export LD_LIBRARY_PATH=$PWD:$LD_LIBRARY_PATH
+export $CUDA_HOME = /usr/local/cuda
 for SCHEME in "uvm" "uvm_h2o"
 do
-  g++ $UVM_PATH/allocate.cpp -o allocate.so --shared -fPIC -I$CUDA_HOME/include
+  # g++ $UVM_PATH/allocate.cpp -o allocate.so --shared -fPIC -I$CUDA_HOME/include
+  g++ /home/ubuntu/clk/infinigen/speedup/uvm/allocate.cpp -o allocate.so --shared -fPIC -I /usr/local/cuda/include
+
   for BSZ in 4 8 12 16 20
   do
     CMD="--embed_dim 5120 --ffn_dim 20480 --enable_bias --n_head 40 --do_layer_norm_before --n_layer 40 --bsz $BSZ --prompt_len 1920 --gen_len 128 --runs 1"
