@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 
 from typing import Dict, Optional  # noqa: F401
-from specdec import utils
+from spattn import utils
 
 # global constats to address Tree.data rows
 TOKENS = 0
