@@ -7,7 +7,7 @@ import torch
 import logging
 import math
 
-from .. import utils
+from spattn import utils
 from .spec_base import SpecBase
 from .trees import TOKENS, POSITIONS, PARENTS, STATUS  # noqa: F401
 
@@ -29,7 +29,7 @@ class SpecExecBase(SpecBase):
         else:
             self.draft_engine.set_max_len(draft_max_len)
 
-        self.target_engine.set_max_len(target_max_len)
+        # self.target_engine.set_max_len(target_max_len)
         logger.info(f"Max_len reset: {draft_max_len=}, {target_max_len=}")
 
     @torch.inference_mode()
@@ -129,6 +129,7 @@ class SpecExecBase(SpecBase):
         position_ids = self.tree.positions[input_token_map_bool].unsqueeze(0)
         logger.info(f"VAL {input_ids.shape=}, {amask_target.shape=}, {self.target_engine.kv_len_used=}, {self.tree.prefix_len=}, {self.tree.end=}")
 
+        # modify the target_engine input
         target_logits = self.target_engine.forward(
             input_ids=input_ids,
             attention_mask=self.tree.invert_mask(amask_target, dtype=self.target_engine.model.dtype),

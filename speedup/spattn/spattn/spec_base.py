@@ -38,8 +38,12 @@ class SpecBase(ABC):
     ):
         if kwargs:
             logger.debug(f"Found unused {kwargs=}")
-
+            
+        #original
         self.prefix_tokens = self.tokenizer.encode(prompt)
+
+        #specExec
+        # self.prefix_tokens = prompt
         self.original_num_tokens = len(self.prefix_tokens)
 
         logger.info(f"{self.__class__.__name__} starting generation.")
@@ -50,7 +54,8 @@ class SpecBase(ABC):
         self.summary = {
             **kwargs,
             "draft_model_name": self.draft_engine.config._name_or_path,
-            "target_model_name": self.target_engine.config._name_or_path,
+            "target_model_name": self.target_engine.path,
+            # "target_model_name": self.target_engine.config.name,
             "prompt_len": len(self.prefix_tokens),
             "prompt_text": prompt,
             "seed": seed,
@@ -156,4 +161,4 @@ class SpecBase(ABC):
 
     def reset_engines(self, **kwargs):
         self.draft_engine.clear_kv()
-        self.target_engine.clear_kv()
+        # self.target_engine.clear_kv()

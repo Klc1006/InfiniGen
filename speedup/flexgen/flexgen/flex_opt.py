@@ -1,1 +1,1 @@
-/home/ubuntu/clk/infinigen/speedup/flexgen/infinigen/flex_opt.py
+/home/ubuntu/clk/infinigen/speedup/flexgen/spattn/flex_opt.py

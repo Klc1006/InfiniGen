@@ -84,6 +84,7 @@ class Tree:
         attention_mask = self.amask[..., input_idxs, :]
 
         with utils.Timing(synchronize=(logger.level <= logging.DEBUG)) as t:
+        # with utils.Timing(synchronize=False) as t:
             logits = self.engine.forward(
                 input_ids=input_ids,
                 attention_mask=self.invert_mask(attention_mask, dtype=self.engine.model.dtype),
